@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="config.js"></script>
+    <script type="text/javascript">
+        window.location.replace(repoBase);
+    </script>
+</head>
+<body>
+    <p>Redirecting to the repository homepage... If not, <a id="redirectLink" href="#">click here</a>.</p>
+    <script>
+        document.getElementById("redirectLink").href = repoBase;
+    </script>
+</body>
+</html>

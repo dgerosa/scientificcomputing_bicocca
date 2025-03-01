@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="config.js"></script>
+    <script type="text/javascript">
+        // Get the current path after the GitHub Pages domain
+        var currentPath = window.location.pathname;
+
+        // Remove the repository prefix "/repoName" (e.g., "/astrostatistics_bicocca")
+        var repoPrefix = "/" + repoName;
+        if (currentPath.startsWith(repoPrefix)) {
+            currentPath = currentPath.substring(repoPrefix.length);
+        }
+
+        // Construct the final GitHub URL
+        var targetURL = repoBase + currentPath;
+
+        // Redirect
+        window.location.replace(targetURL);
+    </script>
+</head>
+<body>
+    <p>Redirecting... If not, <a id="redirectLink" href="#">click here</a>.</p>
+    <script>
+        document.getElementById("redirectLink").href = targetURL;
+    </script>
+</body>
+</html>
