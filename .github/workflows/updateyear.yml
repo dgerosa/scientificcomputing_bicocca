@@ -1,0 +1,89 @@
+name: Update config.js year
+
+on:
+  workflow_dispatch: # Allow manual runs
+  schedule:
+    - cron: "0 6 * * 1" # Run every Monday at 06:00 UTC
+
+permissions:
+  contents: write 
+  
+jobs:
+  update-year:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the repository so we can read and modify files
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # Step 2: Extract the `repoName` variable from config.js
+      # This makes the Action portable for other repos without hardcoding the name.
+      - name: Extract repoName from config.js
+        id: read_name
+        run: |
+          # Find the value inside quotes after `var repoName = "`
+          repoName=$(grep -Po '(?<=var repoName = ")[^"]+' config.js)
+          # Pass it to later steps as an output
+          echo "repoName=$repoName" >> $GITHUB_OUTPUT
+          echo "Found repoName: $repoName"
+
+      # Step 3: Detect GitHub username automatically from the current repository
+      - name: Detect GitHub username
+        id: read_user
+        run: |
+          # Use the GitHub Actions environment variable GITHUB_REPOSITORY, format "username/repo"
+          user=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
+          echo "user=$user" >> $GITHUB_OUTPUT
+          echo "Detected GitHub username: $user"
+
+      # Step 4: Find the latest available year for a repo matching `repoName_<year>`
+      # Uses GitHub CLI (`gh`) to list repos and find the max year
+      - name: Find latest repo year
+        id: find_year
+        run: |
+          repoName="${{ steps.read_name.outputs.repoName }}"
+          user="${{ steps.read_user.outputs.user }}"
+
+          # List all repos for the user in JSON, extract only their names
+          repos=$(gh repo list "$user" --json name --jq '.[].name')
+
+          # Match only repos like "repoName_YYYY", extract the year, sort, and get the largest
+          latest_year=$(echo "$repos" | grep "^${repoName}_[0-9]\{4\}$" \
+                                      | sed "s/${repoName}_//" \
+                                      | sort -n \
+                                      | tail -1)
+
+          # Stop the Action if no repos were found
+          if [ -z "$latest_year" ]; then
+            echo "❌ No matching repos found."
+            exit 1
+          fi
+
+          echo "Latest year: $latest_year"
+          # Pass the result to later steps
+          echo "year=$latest_year" >> $GITHUB_OUTPUT
+
+        env:
+          # Authentication for GitHub CLI — automatically provided by Actions
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 5: Update ONLY the `var year = ...;` line in config.js
+      - name: Update year in config.js
+        run: |
+          year="${{ steps.find_year.outputs.year }}"
+          # Replace the first number after "var year = " with the new year
+          sed -i "s/var year = [0-9]\+;/var year = ${year};/" config.js
+
+      # Step 6: Commit and push the change if config.js was modified
+      - name: Commit and push if changed
+        run: |
+          # Check if there are any file changes
+          if git diff --quiet; then
+            echo "No changes to commit."
+          else
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add config.js
+            git commit -m "Update year in config.js to ${{ steps.find_year.outputs.year }}"
+            git push
+          fi
